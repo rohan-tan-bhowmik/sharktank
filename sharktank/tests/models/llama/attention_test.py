@@ -50,11 +50,13 @@ class AttentionBlockTest(unittest.TestCase):
             head_dim=head_dim,
             head_count_kv=head_count_kv,
             rms_epsilon=rms_epsilon,
+            hf=True,
         )
         attention_embedding = RotaryEmbeddingLayer(
             rope_dimension_count=rope_dimension_count,
             max_seqlen=max_seq_len,
             device="cpu",
+            hf=True,
         )
 
         input_tensor = torch.rand(
@@ -62,6 +64,7 @@ class AttentionBlockTest(unittest.TestCase):
             seq_len,
             head_count*head_dim
         ) * 2 - 1
+
         h = attention_block(
             input_tensor,
             embedding=attention_embedding,
@@ -83,27 +86,27 @@ class AttentionBlockTest(unittest.TestCase):
             layer_idx=block_index
         )
 
-        llama_attention_block.q_proj.weight = torch.nn.Parameter(attention_block_theta("attn_q.weight").as_torch(), requires_grad=True)
-        llama_attention_block.k_proj.weight = torch.nn.Parameter(attention_block_theta("attn_v.weight").as_torch(), requires_grad=True)
-        llama_attention_block.v_proj.weight = torch.nn.Parameter(attention_block_theta("attn_k.weight").as_torch(), requires_grad=True)
-        llama_attention_block.o_proj.weight = torch.nn.Parameter(attention_block_theta("attn_output.weight").as_torch(), requires_grad=True)
+        llama_attention_block.q_proj.weight = torch.nn.Parameter(attention_block_theta("self_attn.q_proj.weight").as_torch(), requires_grad=True)
+        llama_attention_block.k_proj.weight = torch.nn.Parameter(attention_block_theta("self_attn.k_proj.weight").as_torch(), requires_grad=True)
+        llama_attention_block.v_proj.weight = torch.nn.Parameter(attention_block_theta("self_attn.v_proj.weight").as_torch(), requires_grad=True)
+        llama_attention_block.o_proj.weight = torch.nn.Parameter(attention_block_theta("self_attn.o_proj.weight").as_torch(), requires_grad=True)
 
         llama_mlp = LlamaMLP(config=llama_config)
-        llama_mlp.gate_proj.weight = torch.nn.Parameter(attention_block_theta("ffn_gate.weight").as_torch(), requires_grad=True)
-        llama_mlp.up_proj.weight = torch.nn.Parameter(attention_block_theta("ffn_up.weight").as_torch(), requires_grad=True)
-        llama_mlp.down_proj.weight = torch.nn.Parameter(attention_block_theta("ffn_down.weight").as_torch(), requires_grad=True)
+        llama_mlp.gate_proj.weight = torch.nn.Parameter(attention_block_theta("mlp.gate_proj.weight").as_torch(), requires_grad=True)
+        llama_mlp.up_proj.weight = torch.nn.Parameter(attention_block_theta("mlp.up_proj.weight").as_torch(), requires_grad=True)
+        llama_mlp.down_proj.weight = torch.nn.Parameter(attention_block_theta("mlp.down_proj.weight").as_torch(), requires_grad=True)
 
         llama_input_layernorm = LlamaRMSNorm(
             hidden_size=hidden_size,
             eps=rms_epsilon
         )
-        llama_input_layernorm.weight = torch.nn.Parameter(attention_block_theta("attn_norm.weight").as_torch(), requires_grad=True)
+        llama_input_layernorm.weight = torch.nn.Parameter(attention_block_theta("input_layernorm.weight").as_torch(), requires_grad=True)
 
         llama_post_attention_layernorm = LlamaRMSNorm(
             hidden_size=hidden_size,
             eps=rms_epsilon
         )
-        llama_post_attention_layernorm.weight = torch.nn.Parameter(attention_block_theta("ffn_norm.weight").as_torch(), requires_grad=True)
+        llama_post_attention_layernorm.weight = torch.nn.Parameter(attention_block_theta("post_attention_layernorm.weight").as_torch(), requires_grad=True)
 
         llama_decoder_layer = LlamaDecoderLayer(
             config=llama_config,
@@ -114,16 +117,9 @@ class AttentionBlockTest(unittest.TestCase):
         llama_decoder_layer.input_layernorm = llama_input_layernorm
         llama_decoder_layer.post_attention_layernorm = llama_post_attention_layernorm
 
-        # Batch, seq_id, seq_len
         g = llama_decoder_layer(
             input_tensor,
             position_ids=torch.arange(seq_len).view(1, seq_len),
-            # position_ids=torch.arange(1).view(1, 1),
-            # position_ids=torch.tensor([[0]])
-            # embedding=attention_embedding,
-            # start_index=0,
-            # cache_state=paged_kv_cache.paged.allocate(128),
-            # seq_block_ids=torch.tensor([[0]])
         )[0]
 
         assert h.shape == g.shape

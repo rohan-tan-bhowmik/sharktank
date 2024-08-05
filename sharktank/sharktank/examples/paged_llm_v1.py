@@ -255,7 +255,6 @@ def main():
     )
     if use_fp8_quantization:
         quantize_theta(dataset.root_theta)
-    print(dataset.root_theta._tree)
     model = PagedLlamaModelV1(dataset.root_theta, config)
     generator = TorchGenerator(model, tokenizer)
 

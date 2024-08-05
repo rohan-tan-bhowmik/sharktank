@@ -21,31 +21,31 @@ def make_attention_block_theta(
 ) -> Theta:
     return Theta(
         {
-            "attn_q.weight": DefaultPrimitiveTensor(
+            "self_attn.q_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim, feature_dim), dtype=dtype)
             ),
-            "attn_k.weight": DefaultPrimitiveTensor(
+            "self_attn.k_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim, feature_dim), dtype=dtype)
             ),
-            "attn_v.weight": DefaultPrimitiveTensor(
+            "self_attn.v_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim, feature_dim), dtype=dtype)
             ),
-            "attn_output.weight": DefaultPrimitiveTensor(
+            "self_attn.o_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim, feature_dim), dtype=dtype)
             ),
-            "attn_norm.weight": DefaultPrimitiveTensor(
+            "input_layernorm.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim), dtype=dtype)
             ),
-            "ffn_gate.weight": DefaultPrimitiveTensor(
+            "mlp.gate_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((ffn_dim, feature_dim), dtype=dtype)
             ),
-            "ffn_up.weight": DefaultPrimitiveTensor(
+            "mlp.up_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((ffn_dim, feature_dim), dtype=dtype)
             ),
-            "ffn_down.weight": DefaultPrimitiveTensor(
+            "mlp.down_proj.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim, ffn_dim), dtype=dtype)
             ),
-            "ffn_norm.weight": DefaultPrimitiveTensor(
+            "post_attention_layernorm.weight": DefaultPrimitiveTensor(
                 data=make_rand_torch((feature_dim), dtype=dtype)
             ),
         }

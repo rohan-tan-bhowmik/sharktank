@@ -15,6 +15,7 @@ import torch.nn.functional as F
 
 from ...layers import *
 from ...types import *
+from ... import ops
 
 __all__ = [
     "LlamaModelConfig",
@@ -35,7 +36,7 @@ class LlamaModelConfig:
     block_seq_stride: int = 16
 
     # Either "paged" or "direct".
-    kv_cache_type: str = "direct"
+    kv_cache_type: str = "paged"
 
     # The device on which to place intermediate state.
     device: Optional[torch.device] = None
@@ -45,6 +46,9 @@ class LlamaModelConfig:
 
     # Dtype to use for attention.
     attention_dtype: torch.dtype = torch.float16
+
+    # Indicates if running with HuggingFace implementation.
+    hf: bool = False
 
     def create_kv_cache(self) -> BaseKVCache:
         hp = self.hp
@@ -108,13 +112,11 @@ class PagedLlamaModelV1(BaseCausalLMModel):
             activation_dtype=config.activation_dtype,
             attention_dtype=config.attention_dtype,
         )
-        self.hf = False
         self.config = config
         self.hp = hp
         self.cache = config.create_kv_cache()
         self.activation_dtype = config.activation_dtype
-        print(self.hp.block_count)
-        print("block count")
+        self.hf = config.hf
 
         key = "token_embd"
         if key not in list(theta.keys):
@@ -130,6 +132,7 @@ class PagedLlamaModelV1(BaseCausalLMModel):
                 rope_dimension_count=hp.rope_dimension_count,
                 max_seqlen=hp.context_length,
                 device=self.device,
+                hf=self.hf
             ),
         )
         key = "output_norm" if "output_norm" in list(theta.keys) else "model.norm"
@@ -167,8 +170,6 @@ class PagedLlamaModelV1(BaseCausalLMModel):
         seq_block_ids: torch.Tensor,
         cache_state: list[torch.Tensor],
     ):
-        print("tokens.shape: ")
-        print(tokens.shape)
         self._assert_device(tokens)
         self._assert_device(attention_mask, dtype=self.activation_dtype)
         self._assert_device(seq_block_ids)
@@ -286,17 +287,13 @@ class PagedLlamaAttentionBlock(ThetaLayer):
         head_dim: int,
         head_count_kv: int,
         rms_epsilon: float,
-        hf=False,
+        hf: bool = False,
     ):
         super().__init__(theta)
         if hf:
-            # tensor = theta("self_attn.qkv.weight").tensor
-            # tensor = tensor.reshape(head_count_kv, head_count // head_count_kv + 2, head_dim, head_dim * head_count)
-            # print(tensor)
             self.add_module(
                 "attn_norm", RMSNormLayer(theta("input_layernorm"), epsilon=rms_epsilon)
             )
-            # self.add_module("attn_qkv", LinearLayer(theta("self_attn.qkv")))
             self.add_module("attn_q", LinearLayer(theta("self_attn.q_proj")))
             self.add_module("attn_k", LinearLayer(theta("self_attn.k_proj")))
             self.add_module("attn_v", LinearLayer(theta("self_attn.v_proj")))
@@ -329,6 +326,7 @@ class PagedLlamaAttentionBlock(ThetaLayer):
         self.head_count = head_count
         self.head_dim = head_dim
         self.head_count_kv = head_count_kv
+        self.hf = hf
 
     def forward(
         self,
@@ -353,14 +351,9 @@ class PagedLlamaAttentionBlock(ThetaLayer):
         assert feature_dim == self.head_count * self.head_dim
 
         xq = self.attn_q(x)
-        print("xq shape: ")
-        print(xq.shape)
         xk = self.attn_k(x)
         xv = self.attn_v(x)
 
-        print("batch_seq_len: ", batch_seq_len)
-        print("head count: ", self.head_count)
-        print("head_dim: ", self.head_dim)
         xq = xq.view(bs, batch_seq_len, self.head_count, self.head_dim)
         xk = xk.view(bs, batch_seq_len, self.head_count_kv, self.head_dim)
         xv = xv.view(bs, batch_seq_len, self.head_count_kv, self.head_dim)
@@ -415,7 +408,7 @@ class PagedLlamaAttentionBlock(ThetaLayer):
             xk = repeat_kv(xk)
             xv = repeat_kv(xv)
 
-        # Tranpose into [bs, heads, sl, dim]
+        # Transpose into [bs, heads, sl, dim]
         xq = xq.transpose(1, 2)
         keys = xk.transpose(1, 2)
         values = xv.transpose(1, 2)
