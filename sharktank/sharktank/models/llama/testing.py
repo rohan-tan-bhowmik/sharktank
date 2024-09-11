@@ -11,6 +11,8 @@ import torch
 from ...types.tensors import *
 from ...types.theta import Theta
 
+# Range of torch.rand() is [0,1)
+# Range of torch.rand() * 2 - 1 is [-1, 1), includes negative values
 def make_rand_torch(shape, dtype):
     return torch.rand(shape, dtype=dtype) * 2 - 1
 

@@ -163,18 +163,18 @@ def matmul_default(lhs, rhs, *, transpose_rhs: bool) -> Tensor:
 
 # Scaled dot product attention
 @scaled_dot_product_attention.override(
-    Tensor, Tensor, Tensor, Optional[Tensor], auto_dequant=True
+    Tensor, Tensor, Tensor, Optional[Tensor], Optional[float], Optional[bool], auto_dequant=True
 )
-def scaled_dot_product_attention(q, k, v, a) -> Tensor:
+def scaled_dot_product_attention(q, k, v, a, dropout_p=0.0, is_causal=False) -> Tensor:
     q = unbox_tensor(q)
     k = unbox_tensor(k)
     v = unbox_tensor(v)
     if a is not None:
         a = unbox_tensor(a)
-
+    
     # TODO: plumb dropout and is_causal through ops
     return torch.nn.functional.scaled_dot_product_attention(
-        q, k, v, attn_mask=a, dropout_p=0.0, is_causal=False
+        q, k, v, attn_mask=a, dropout_p=dropout_p, is_causal=is_causal
     )
 
 

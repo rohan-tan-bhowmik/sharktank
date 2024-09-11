@@ -48,7 +48,7 @@ class LlamaModelConfig:
     attention_dtype: torch.dtype = torch.float16
 
     # Indicates if running with HuggingFace implementation.
-    hf: bool = False
+    use_hf: bool = False
 
     def create_kv_cache(self) -> BaseKVCache:
         hp = self.hp
@@ -116,11 +116,11 @@ class PagedLlamaModelV1(BaseCausalLMModel):
         self.hp = hp
         self.cache = config.create_kv_cache()
         self.activation_dtype = config.activation_dtype
-        self.hf = config.hf
+        self.use_hf = config.use_hf
 
         key = "token_embd"
         if key not in list(theta.keys):
-            self.hf = True
+            self.use_hf = True
             key = "model.embed_tokens"
         self.add_module(
             "token_embedding",
@@ -132,7 +132,7 @@ class PagedLlamaModelV1(BaseCausalLMModel):
                 rope_dimension_count=hp.rope_dimension_count,
                 max_seqlen=hp.context_length,
                 device=self.device,
-                hf=self.hf
+                use_hf=self.use_hf
             ),
         )
         key = "output_norm" if "output_norm" in list(theta.keys) else "model.norm"
@@ -153,7 +153,7 @@ class PagedLlamaModelV1(BaseCausalLMModel):
                     head_dim=hp.attn_head_dim,
                     head_count_kv=hp.attention_head_count_kv,
                     rms_epsilon=hp.attention_layer_norm_rms_epsilon,
-                    hf=self.hf,
+                    use_hf=self.use_hf,
                 )
                 for n in range(hp.block_count)
             ]
@@ -287,10 +287,10 @@ class PagedLlamaAttentionBlock(ThetaLayer):
         head_dim: int,
         head_count_kv: int,
         rms_epsilon: float,
-        hf: bool = False,
+        use_hf: bool = False,
     ):
         super().__init__(theta)
-        if hf:
+        if use_hf:
             self.add_module(
                 "attn_norm", RMSNormLayer(theta("input_layernorm"), epsilon=rms_epsilon)
             )
@@ -326,7 +326,7 @@ class PagedLlamaAttentionBlock(ThetaLayer):
         self.head_count = head_count
         self.head_dim = head_dim
         self.head_count_kv = head_count_kv
-        self.hf = hf
+        self.use_hf = use_hf
 
     def forward(
         self,
