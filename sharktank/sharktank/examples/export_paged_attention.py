@@ -87,7 +87,7 @@ def paged_attention(
     keys = xk.transpose(1, 2)
     values = xv.transpose(1, 2)
     attn_output = F.scaled_dot_product_attention(
-        xq, keys, values, attn_mask=attention_mask, is_causal=is_causal
+        xq, keys, values, attn_mask=None, is_causal=True
     )
     attn_output = attn_output.transpose(1, 2).reshape(bs, batch_seq_len, -1)
     return attn_output
